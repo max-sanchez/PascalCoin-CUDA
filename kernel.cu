@@ -558,7 +558,7 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 			timestamp = ((timestamp & 0x000000FF) << 24) + ((timestamp & 0x0000FF00) << 8) + ((timestamp & 0x00FF0000) >> 8) + ((timestamp & 0xFF000000) >> 24);
 			printf("Found nonce: %08x    T: %08x    Hashrate: %.3f MH/s   Total: %d\n", nonce, timestamp, (((((double)totalNonces) * 4 * 16 * 16 * 16 * 16) / (4)) / (((double)getTimeMillis() - start) / 1000)), totalNonces);
 
-		
+			
 			FILE* f2;
 			f2 = fopen("datain.txt", "w");
 			while (f2 == NULL)
@@ -568,7 +568,8 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 
 			fprintf(f2, "\$%08x\n", nonce);
 			fprintf(f2, "\$%08x", timestamp);
-			fclose(f2);
+			fclose(f2); 
+			
 
 			*nonceOut = 0;
 			totalNonces++;
@@ -579,9 +580,24 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 	double timeDelta = endTime - startTime;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 	int deviceToUse = 0;
+	int i = 0; int j = 0;
+
+	if (argc > 1)
+	{
+		for (i = 1; i < argc; i++)
+		{
+			char* argument = argv[i];
+			if (argument[0] == 'd')
+			{
+				deviceToUse = argument[1] - 48;
+			}
+		}
+	}
+
+	printf("Using Device: %d\n\n", deviceToUse);
 
 	unsigned int items_per_iter = 256 * 256 * 256 * 16;
 
