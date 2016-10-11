@@ -243,8 +243,8 @@ __global__ void __launch_bounds__(blocksize, 8) nonceGrindc(uint32_t *const __re
 		h6 += g;
 		h7 += h;
 
-		uint32_t targetX = h0 & 0xFFFFFF00;
-		uint32_t targetY = h1 & 0x00000000;
+		uint32_t targetX = h0 & 0xFFFFFFFF;
+		uint32_t targetY = h1 & 0xF0000000;
 		if (targetX == 0 && targetY == 0)
 		{
 			*nonceOut = n;
@@ -556,9 +556,9 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 			nonce = (((nonce & 0xFF000000) >> 24) | ((nonce & 0x00FF0000) >> 8) | ((nonce & 0x0000FF00) << 8) | ((nonce & 0x000000FF) << 24));
 			uint32_t timestamp = remainingHeader[10];
 			timestamp = ((timestamp & 0x000000FF) << 24) + ((timestamp & 0x0000FF00) << 8) + ((timestamp & 0x00FF0000) >> 8) + ((timestamp & 0xFF000000) >> 24);
-			printf("Found nonce: %08x    T: %08x    Hashrate: %.3f MH/s   Total: %d\n", nonce, timestamp, (((((double)totalNonces) * 4 * 16) / (4)) / (((double)getTimeMillis() - start) / 1000)), totalNonces);
+			printf("Found nonce: %08x    T: %08x    Hashrate: %.3f MH/s   Total: %d\n", nonce, timestamp, (((((double)totalNonces) * 4 * 16 * 16 * 16 * 16) / (4)) / (((double)getTimeMillis() - start) / 1000)), totalNonces);
 
-			/*
+		
 			FILE* f2;
 			f2 = fopen("datain.txt", "w");
 			while (f2 == NULL)
@@ -568,7 +568,7 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 
 			fprintf(f2, "\$%08x\n", nonce);
 			fprintf(f2, "\$%08x", timestamp);
-			fclose(f2); */
+			fclose(f2);
 
 			*nonceOut = 0;
 			totalNonces++;
