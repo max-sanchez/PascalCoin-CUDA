@@ -304,7 +304,13 @@ void getHeaderForWork(uint8_t *header)
 	{
 		callInc = 0;
 		FILE *fr;
-		fr = fopen("headerout.txt", "rt");
+
+
+		char fileName[16] = "headeroutXX.txt";
+		fileName[9]  = (deviceToUse / 10) + 48;
+		fileName[10] = (deviceToUse % 10) + 48;
+
+		fr = fopen(fileName, "rt");
 		fgets(hex, 352, fr);
 		hex[352] = '\0';
 
