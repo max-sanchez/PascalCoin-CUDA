@@ -99,7 +99,7 @@ __global__ void __launch_bounds__(blocksize, 8) nonceGrindc(uint32_t *const __re
 	uint32_t midstate[8];
 
 	// const uint32_t id = (blockDim.x * blockIdx.x * blockIdx.x * blockIdx.x * headerIn[16] + threadIdx.x)*npt;
-	const uint32_t id = (headerIn[16] << 24) | (blockDim.x * blockIdx.x + threadIdx.x)*npt;
+	const uint32_t id = (headerIn[16] << 20) | (blockDim.x * blockIdx.x + threadIdx.x)*npt;
 
 	midstate[0] = midstateIn[0];
 	midstate[1] = midstateIn[1];
@@ -249,7 +249,12 @@ __global__ void __launch_bounds__(blocksize, 8) nonceGrindc(uint32_t *const __re
 		{
 			*nonceOut = n;
 			/* Uncomment these for additional mining information/verbosity */
-			//printf("    The hash is: \n%08x %08x %08x %08x %08x %08x %08x %08x \n", h0, h1, h2, h3, h4, h5, h6, h7);
+			printf("    The hash is: \n%08x %08x %08x %08x %08x %08x %08x %08x \n", h0, h1, h2, h3, h4, h5, h6, h7);
+			//printf("      headerIn[16]:  %d\n", headerIn[16]);
+			//printf("      blockDim.x:    %d\n", blockDim.x);
+			//printf("      blockIdx.x:    %d\n", blockIdx.x);
+			//printf("      threadIdx.x:   %d\n", threadIdx.x);
+			//printf("      npt:           %d\n", npt);
 			//printf("    And the total:\n    %08x %08x %08x %08x %08x %08x %08x %08x \n", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
 			//printf("    %08x %08x %08x %08x %08x %08x %08x %08x]\n", buffer[8], buffer[9], buffer[10], buffer[11], buffer[12], buffer[13], buffer[14], buffer[15]);
 		}
@@ -292,6 +297,7 @@ bool different(char* one, char* two, int length)
 	return false;
 }
 
+int deviceToUse = 0;
 void getHeaderForWork(uint8_t *header)
 {
 	if (callInc % 200 == 0)
@@ -314,7 +320,7 @@ void getHeaderForWork(uint8_t *header)
 
 		fclose(fr);
 	}
-
+	 
 	callInc++;
 	unsigned char* bufferHeader = hexToByteArray(hex);
 	memcpy(header, bufferHeader, headerSize);
@@ -560,10 +566,16 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 
 			
 			FILE* f2;
-			f2 = fopen("datain.txt", "w");
+
+			char fileName[13] = "datainXX.txt";
+			fileName[6] = (deviceToUse / 10) + 48;
+			fileName[7] = (deviceToUse % 10) + 48;
+			printf("Reading from %s\n", fileName);
+
+			f2 = fopen(fileName, "w");
 			while (f2 == NULL)
 			{
-				f2 = fopen("datain.txt", "w");
+				f2 = fopen(fileName, "w");
 			}
 
 			fprintf(f2, "\$%08x\n", nonce);
@@ -582,7 +594,6 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 
 int main(int argc, char *argv[])
 {
-	int deviceToUse = 0;
 	int i = 0; int j = 0;
 
 	if (argc > 1)
