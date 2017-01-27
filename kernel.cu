@@ -19,29 +19,17 @@ uint32_t *blockHeadermobj = nullptr;
 uint32_t *midStatemobj    = nullptr;
 uint32_t *nonceOutmobj    = nullptr;
 
-__device__ __forceinline__ uint32_t
-ror(const uint32_t a, const unsigned int n)
+__device__ __forceinline__ uint32_t ror(const uint32_t a, const unsigned int n)
 {
-#if __CUDA_ARCH__ >= 999 // Disabled
-	uint32_t d;
-	asm("shf.r.clamp.b32 %0, %1, %2, %3;" : "=r"(d) : "r"(a), "r"(a), "r"(n));
-	return d;
+#if __CUDA_ARCH__ >= 350
+	return __funnelshift_r((a), (a), (n));
 #else
 	return (a >> n) | (a << (32 - n));
 #endif
 }
 
-__device__ __forceinline__ uint32_t
-shr(const uint32_t a, const unsigned int n)
-{
-#if __CUDA_ARCH__ >= 999 // Disabled
-	uint32_t d;
-	asm("vshr.u32.u32.u32.clamp %0, %1, %2;" : "=r"(d) : "r"(a), "r"(n));
-	return d;
-#else
-	return a >> n;
-#endif
-}
+
+#define shr (a) >> (n);
 
 #define ROTRIGHT(a,b) ((a >> b) | (a << (32 - b)))
 #define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
@@ -49,7 +37,7 @@ shr(const uint32_t a, const unsigned int n)
 #define SIG0c(x) (ror(x,7) ^ ror(x,18) ^ ((x) >> 3))
 #define SIG1c(x) (ror(x,17) ^ ror(x,19) ^ ((x) >> 10))
 
-#define blocksize 2048
+#define blocksize 2048 
 #define npt 9
 
 static const uint32_t k[64] = {
@@ -111,7 +99,8 @@ __global__ void __launch_bounds__(blocksize, 8) nonceGrindc(uint32_t *const __re
 	midstate[7] = midstateIn[7];
 
 	int j = 0;
-
+	
+	#pragma unroll
 	for (j = 0; j < 16; j++)
 	{
 		buffer[j] = headerIn[j];
@@ -150,16 +139,17 @@ __global__ void __launch_bounds__(blocksize, 8) nonceGrindc(uint32_t *const __re
 		buffer[11] = n;
 		// printf("Nonce being used: %d\n" + buffer[11]);
 
+		#pragma unroll
 		for (j = 0; j < 16; j++)
 		{
 			block[j] = buffer[j];
 		}
-
+		#pragma unroll
 		for (j = 16; j < 64; j++)
 		{
 			block[j] = block[j - 16] + block[j - 7] + SIG1c(block[j - 2]) + SIG0c(block[j - 15]);
 		}
-
+		#pragma unroll
 		for (j = 0; j < 64; j++)
 		{
 			S1 = (ror(e, 6)) ^ (ror(e, 11)) ^ (ror(e, 25));
@@ -211,12 +201,14 @@ __global__ void __launch_bounds__(blocksize, 8) nonceGrindc(uint32_t *const __re
 		h5 = f = 0x9b05688c;
 		h6 = g = 0x1f83d9ab;
 		h7 = h = 0x5be0cd19;
-
+		
+		#pragma unroll
 		for (j = 16; j < 64; j++)
 		{
 			block[j] = block[j - 16] + block[j - 7] + SIG1c(block[j - 2]) + SIG0c(block[j - 15]);
 		}
 
+		#pragma unroll
 		for (j = 0; j < 64; j++)
 		{
 			S1 = (ror(e, 6)) ^ (ror(e, 11)) ^ (ror(e, 25));
@@ -343,7 +335,7 @@ void getHeaderForWork(uint8_t *header)
 void nonceGrindcuda(cudaStream_t cudastream, uint32_t threads, uint32_t *blockHeader, uint32_t *midState, uint32_t *nonceOut)
 {
 	cudaError_t e = cudaGetLastError();
-	nonceGrindc << <128, 768, 2048, cudastream >> >(blockHeader, midState, nonceOut);
+	nonceGrindc << <128, 768, blocksize, cudastream >> >(blockHeader, midState, nonceOut);
 	e = cudaGetLastError();
 	if (e != cudaSuccess)
 	{
@@ -570,13 +562,12 @@ void grindNonces(uint32_t items_per_iter, int cycles_per_iter)
 			timestamp = ((timestamp & 0x000000FF) << 24) + ((timestamp & 0x0000FF00) << 8) + ((timestamp & 0x00FF0000) >> 8) + ((timestamp & 0xFF000000) >> 24);
 			printf("Found nonce: %08x    T: %08x    Hashrate: %.3f MH/s   Total: %d\n", nonce, timestamp, (((((double)totalNonces) * 4 * 16 * 16 * 16 * 16) / (4)) / (((double)getTimeMillis() - start) / 1000)), totalNonces);
 
-			
+		    
 			FILE* f2;
 
 			char fileName[13] = "datainXX.txt";
 			fileName[6] = (deviceToUse / 10) + 48;
 			fileName[7] = (deviceToUse % 10) + 48;
-			printf("Reading from %s\n", fileName);
 
 			f2 = fopen(fileName, "w");
 			while (f2 == NULL)
@@ -616,7 +607,7 @@ int main(int argc, char *argv[])
 
 	printf("Using Device: %d\n\n", deviceToUse);
 
-	unsigned int items_per_iter = 256 * 256 * 256 * 16;
+	unsigned int items_per_iter = 256 * 256 * 256 * 8;
 
 	unsigned int cycles_per_iter = 15;
 	double seconds_per_iter = 10.0;
